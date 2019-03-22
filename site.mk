@@ -24,6 +24,7 @@ GLUON_SITE_PACKAGES := \
 	iwinfo \
 	iptables \
 	haveged \
+	ffho-autoupdater-wifi-fallback \
 	gluon-ebtables-filter-arp-ffmuc \
 	gluon-ebtables-filter-multicast-ffmuc \
 	tecff-ath9k-broken-wifi-workaround \
