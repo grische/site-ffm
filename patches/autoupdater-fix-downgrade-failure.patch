@@ -1,0 +1,39 @@
+diff --git a/patches/packages/gluon/0001-Let-sysupgrade-verify-the-image-before-upgrading.patch b/patches/packages/gluon/0001-Let-sysupgrade-verify-the-image-before-upgrading.patch
+new file mode 100644
+index 00000000..35fe4213
+--- /dev/null
++++ b/patches/packages/gluon/0001-Let-sysupgrade-verify-the-image-before-upgrading.patch
+@@ -0,0 +1,33 @@
++From: Grische <dummy>
++Date: Thu, 29 Jul 2021 09:03:51 +0200
++Subject: Let sysupgrade verify the image before upgrading
++
++Fixes issue #193
++
++diff --git a/admin/autoupdater/src/autoupdater.c b/admin/autoupdater/src/autoupdater.c
++index f06ae889ff295cd6d83f76605bba0016a78ecec3..a3337074404421fdbcbd1ee755694121ace1fb7f 100644
++--- a/admin/autoupdater/src/autoupdater.c
+++++ b/admin/autoupdater/src/autoupdater.c
++@@ -378,6 +378,22 @@ static bool autoupdate(const char *mirror, struct settings *s, int lock_fd) {
++ 		}
++ 	}
++ 
+++	/* Test the image upgrade (issue #193) */
+++	{
+++		static const char *const test_option = " --test ";
+++
+++		char buf[strlen(sysupgrade_path) + strlen(test_option) + strlen(firmware_path) + 1];
+++		strcpy(buf, sysupgrade_path);
+++		strcat(buf, test_option);
+++		strcat(buf, firmware_path);
+++
+++        const int sysupgrade_ret = system(buf);
+++		if (WEXITSTATUS(sysupgrade_ret) != 0 ) {
+++			fprintf(stderr, "autoupdater: warning: sysupgrade --test failed with return code: %d\n", WEXITSTATUS(sysupgrade_ret));
+++			goto fail_after_download;
+++		}
+++	}
+++
++ 	clear_manifest(m);
++ 
++ 	/**** Call sysupgrade ************************************************/
