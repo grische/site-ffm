@@ -20,9 +20,9 @@ jobs:
       shell: bash
       run: |
         if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-          matrix="[ramips-mt76x8, x86-64, x86-generic]"
+          matrix="[\"ramips-mt76x8\", \"x86-64\", \"x86-generic\"]"
         else
-          matrix="[ath79-generic, ath79-nand, bcm27xx-bcm2708, bcm27xx-bcm2709, bcm27xx-bcm2710, ipq40xx-generic, ipq806x-generic, lantiq-xway, lantiq-xrx200, mediatek-mt7622, mpc85xx-p1010, mpc85xx-p1020, mvebu-cortexa9, ramips-mt7620, ramips-mt7621, ramips-mt76x8, ramips-rt305x, rockchip-armv8, sunxi-cortexa7, x86-64, x86-generic, x86-geode, x86-legacy]"
+          matrix="[\"ath79-generic\", \"ath79-nand\", \"bcm27xx-bcm2708\", \"bcm27xx-bcm2709\", \"bcm27xx-bcm2710\", \"ipq40xx-generic\", \"ipq806x-generic\", \"lantiq-xway\", \"lantiq-xrx200\", \"mediatek-mt7622\", \"mpc85xx-p1010\", \"mpc85xx-p1020\", \"mvebu-cortexa9\", \"ramips-mt7620\", \"ramips-mt7621\", \"ramips-mt76x8\", \"ramips-rt305x\", \"rockchip-armv8\", \"sunxi-cortexa7\", \"x86-64\", \"x86-generic\", \"x86-geode\", \"x86-legacy\"]"
         fi
         echo ::set-output name=matrix::{\"target\": $(echo $matrix)}\"
 
