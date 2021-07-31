@@ -45,7 +45,15 @@ jobs:
         uses: actions/checkout@master
       - name: Set tag
         id: vars
-        run: echo ::set-output name=tag::${GITHUB_BASE_REF:-${GITHUB_REF#refs/*/}}
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            # use gluons default release name for PRs
+            gluon_release=""
+          else
+            gluon_release="${GITHUB_REF#refs/*/}"
+          fi
+          echo ::set-output name=tag::${gluon_release}
       - name: Initialization environment
         env:
           DEBIAN_FRONTEND: noninteractive
