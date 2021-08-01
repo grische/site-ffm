@@ -43,17 +43,6 @@ jobs:
           remove-haskell: 'true'
       - name: Checkout
         uses: actions/checkout@master
-      - name: Set release name
-        id: set_release
-        shell: bash
-        run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            # use gluons default release name for PRs
-            gluon_release_env_var=""
-          else
-            gluon_release_env_var="GLUON_RELEASE=${GITHUB_REF#refs/*/}"
-          fi
-          echo ::set-output name=env_var::"${gluon_release_env_var}"
       - name: Initialization environment
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -64,7 +53,7 @@ jobs:
         id: compile
         run: |
           git checkout -b patched ${GITHUB_SHA}
-          make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} ${{ steps.set_release.outputs.env_var }} V=s
+          make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
           echo "::set-output name=status::success"
       - name: Upload firmware ${{ matrix.target }}
         uses: actions/upload-artifact@master
