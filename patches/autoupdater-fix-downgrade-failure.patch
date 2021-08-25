@@ -1,9 +1,9 @@
 diff --git a/patches/packages/gluon/0001-autoupdater-verify-the-image-before-upgrading.patch b/patches/packages/gluon/0001-autoupdater-verify-the-image-before-upgrading.patch
 new file mode 100644
-index 00000000..c65f5e9d
+index 00000000..28218f7e
 --- /dev/null
 +++ b/patches/packages/gluon/0001-autoupdater-verify-the-image-before-upgrading.patch
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,40 @@
 +From: Grische <grische>
 +Date: Thu, 29 Jul 2021 09:03:51 +0200
 +Subject: autoupdater: verify the image before upgrading
@@ -16,18 +16,20 @@ index 00000000..c65f5e9d
 +Fixes #193
 +
 +diff --git a/admin/autoupdater/src/autoupdater.c b/admin/autoupdater/src/autoupdater.c
-+index f06ae889ff295cd6d83f76605bba0016a78ecec3..0b04495bb040473da7c8a6f114bc24cf1e30f01e 100644
++index 0b80c0766f1f8e8c438df82f40505294c6098dad..690626330f52c2e3064b2519c46ce397dedcb8fd 100644
 +--- a/admin/autoupdater/src/autoupdater.c
 ++++ b/admin/autoupdater/src/autoupdater.c
-+@@ -378,6 +378,22 @@ static bool autoupdate(const char *mirror, struct settings *s, int lock_fd) {
++@@ -378,6 +378,24 @@ static bool autoupdate(const char *mirror, struct settings *s, int lock_fd) {
 + 		}
 + 	}
 + 
 ++	/* Test the image upgrade (issue #193) */
 ++	{
 ++		static const char *const test_option = " --test ";
+++		static const char *const exec_command = "exec ";
 ++
-++		char buf[strlen(sysupgrade_path) + strlen(test_option) + strlen(firmware_path) + 1];
+++		char buf[strlen(exec_command) + strlen(sysupgrade_path) + strlen(test_option) + strlen(firmware_path) + 1];
+++		strcpy(buf, exec_command);
 ++		strcpy(buf, sysupgrade_path);
 ++		strcat(buf, test_option);
 ++		strcat(buf, firmware_path);
