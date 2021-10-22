@@ -14,6 +14,9 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
 
+# ca-certificates required for Github git cloning
+apt-get -y --no-install-recommends install ca-certificates
+
 # Install build environment
 apt-get -y --no-install-recommends install \
     antlr3 \
