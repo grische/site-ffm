@@ -57,4 +57,5 @@ apt-get -y --no-install-recommends install \
     upx \
     wget \
     xmlto \
-    zlib1g-dev
+    zlib1g-dev \
+    apt # dummy package

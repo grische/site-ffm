@@ -16,15 +16,16 @@ jobs:
     - name: Set target matrix
       id: set_target
       shell: bash
-      run: |
-        target_list="[\"ath79-generic\", \"ath79-nand\", \"bcm27xx-bcm2708\", \"bcm27xx-bcm2709\", \"bcm27xx-bcm2710\", \"bcm27xx-bcm2711\", \"ipq40xx-generic\", \"ipq806x-generic\", \"lantiq-xway\", \"lantiq-xrx200\", \"mediatek-mt7622\", \"mpc85xx-p1010\", \"mpc85xx-p1020\", \"mvebu-cortexa9\", \"ramips-mt7620\", \"ramips-mt7621\", \"ramips-mt76x8\", \"rockchip-armv8\", \"sunxi-cortexa7\", \"x86-64\", \"x86-generic\", \"x86-geode\", \"x86-legacy\"]"
-        echo ::set-output name=target::{\"target\": $(echo $target_list)}\"
+      run: true
 
   build_firmware:
     needs: generate_target_matrix
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.generate_target_matrix.outputs.target_json) }}
+      matrix:
+        target: [ "ath79-generic" ]
+        package: [ "antlr3", "asciidoc", "autoconf", "automake", "autopoint", "binutils", "build-essential", "bzip2", "device-tree-compiler", "flex", "g++-multilib", "gawk", "gcc-multilib", "gettext", "git", "gperf", "lib32gcc1", "libc6-dev-i386", "libelf-dev", "libglib2.0-dev", "libncurses5-dev", "libssl-dev", "libtool", "libz-dev", "msmtp", "p7zip", "p7zip-full", "patch", "python2.7", "python3", "qemu-utils", "subversion", "texinfo", "uglifyjs", "unzip", "upx", "wget", "xmlto", "zlib1g-dev" ]
+
     runs-on: ubuntu-latest
     steps:
       - name: Maximize build space
@@ -41,6 +42,9 @@ jobs:
           fetch-depth: 0
       - name: Install build dependencies
         run: |
+          sudo apt-get purge -y ${{ matrix.package }}
+          sudo apt-get autoremove -y
+          sed -i "/${{ matrix.package }}/d" ./install_build_dependencies.sh
           sudo -E ./install_build_dependencies.sh
       - name: build target ${{ matrix.target }}
         id: compile
@@ -52,7 +56,7 @@ jobs:
         uses: actions/upload-artifact@master
         if: steps.compile.outputs.status == 'success'
         with:
-          name: ${{ matrix.target }}_output
+          name: ${{ matrix.target }}_${{ matrix.package }}_output
           path: ./output
 
   create_release:
