@@ -1,0 +1,62 @@
+name: Test Action storage
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  generate_ncdu_overview1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 4096
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+      - name: Checkout
+        uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+      - name: Install build dependencies
+        run: |
+          sudo -E ./install_build_dependencies.sh
+          sudo apt-get install -y --no-install-recommends ncdu
+      - name: run ncdu
+        run: |
+          mkdir -p ncdu_maximize-build-space/
+          df -h | tee ncdu_maximize-build-space/df_h.txt
+          ncdu -o ncdu_maximize-build-space/ncdu_mnt -x /mnt
+          ncdu -o ncdu_maximize-build-space/ncdu_root -x /
+          ncdu -o ncdu_maximize-build-space/ncdu_all /
+      - name: Upload ncdu output
+        uses: actions/upload-artifact@master
+        with:
+          name: ncdu_maximize-build-space
+          path: ./ncdu_maximize-build-space
+
+  generate_ncdu_overview2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+      - name: Install build dependencies
+        run: |
+          sudo -E ./install_build_dependencies.sh
+          sudo apt-get install -y --no-install-recommends ncdu
+      - name: run ncdu
+        run: |
+          mkdir -p ncdu_default/
+          df -h | tee ncdu_default/df_h.txt
+          ncdu -o ncdu_default/ncdu_mnt -x /mnt
+          ncdu -o ncdu_default/ncdu_root -x /
+          ncdu -o ncdu_default/ncdu_all /
+      - name: Upload ncdu output
+        uses: actions/upload-artifact@master
+        with:
+          name: ncdu_default
+          path: ./ncdu_default
