@@ -61,36 +61,26 @@ jobs:
       fail-fast: false
       matrix:
         target: ["x86-64"]
-        arch: ["aarch64"]
+        arch: ["linux/arm64", "linux/amd64"]
     runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+      options: >-
+        --platform ${{ matrix.arch }}
     steps:
       - name: Checkout
         uses: actions/checkout@master
         with:
           fetch-depth: 0
-      - uses: uraimo/run-on-arch-action@v2
-        name: Build target ${{ matrix.target }}
-        id: runcmd
-        with:
-          arch: ${{ matrix.arch }}
-          distro: ubuntu20.04
-          # Mount the output directory in the container
-          dockerRunArgs: |
-            --volume "${PWD}/output:${PWD}/output"
-          # Not required, but speeds up builds by storing container images in
-          # a GitHub package registry.
-          # githubToken: ${{ github.token }}
-          # install: |
-          run: |
-            uname -a # debugging
-            pwd # debugging
-            ls -al  # debugging
-            ./scripts/install_build_dependencies.sh
-            git config --global --add safe.directory ${PWD}
-            git checkout -b patched ${GITHUB_SHA}
-            make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
-            echo "::set-output name=status::success"
-
+      - name: Install build dependencies
+        run: |
+          sudo -E ./scripts/install_build_dependencies.sh
+      - name: build target ${{ matrix.target }}
+        id: compile
+        run: |
+          git checkout -b patched ${GITHUB_SHA}
+          make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
+          echo "::set-output name=status::success"
       - name: Upload firmware ${{ matrix.target }}
         uses: actions/upload-artifact@master
         if: steps.compile.outputs.status == 'success'
