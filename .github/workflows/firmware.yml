@@ -76,15 +76,17 @@ jobs:
           distro: ubuntu20.04
           # Mount the output directory in the container
           dockerRunArgs: |
-            --volume "${PWD}/output:/output"
+            --volume "${PWD}/output:${PWD}/output"
           # Not required, but speeds up builds by storing container images in
           # a GitHub package registry.
           # githubToken: ${{ github.token }}
-          install: |
-              ./scripts/install_build_dependencies.sh
+          # install: |
           run: |
-            uname -a
-            ls -al
+            uname -a # debugging
+            pwd # debugging
+            ls -al  # debugging
+            ./scripts/install_build_dependencies.sh
+            git config --global --add safe.directory ${PWD}
             git checkout -b patched ${GITHUB_SHA}
             make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
             echo "::set-output name=status::success"
