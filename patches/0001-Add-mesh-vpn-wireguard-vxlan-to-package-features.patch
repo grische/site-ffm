@@ -1,0 +1,26 @@
+From 5b5a59bb9409670161656869317f08dd2a3979d3 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Fri, 16 Sep 2022 15:15:05 +0200
+Subject: [PATCH] Add mesh-vpn-wireguard-vxlan to package/features
+
+---
+ package/features | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/package/features b/package/features
+index da68b369..a17c9542 100644
+--- a/package/features
++++ b/package/features
+@@ -20,7 +20,8 @@ when(_'web-wizard' and (
+ 	_'mesh-vpn-fastd' or
+ 	_'mesh-vpn-fastd-l2tp' or
+ 	_'mesh-vpn-tunneldigger' or
+-	_'mesh-vpn-wireguard'
++	_'mesh-vpn-wireguard' or
++	_'mesh-vpn-wireguard-vxlan'
+ ), {
+ 	'gluon-config-mode-mesh-vpn',
+ })
+-- 
+2.25.1
+
