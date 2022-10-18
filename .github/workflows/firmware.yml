@@ -20,7 +20,6 @@ jobs:
       build_target_json: ${{ steps.set_target.outputs.build_target }}
     steps:
       - name: Set target matrix
-        if: false
         id: set_target
         shell: bash
         run: |
