@@ -7,13 +7,14 @@ on:
       - v*
   pull_request:
     paths-ignore:
-      - '**.md'
-      - '**/CODEOWNERS'
-      - '.github/ISSUE_TEMPLATE'
-      - '.github/*.yml'
+      - "**.md"
+      - "**/CODEOWNERS"
+      - ".github/ISSUE_TEMPLATE"
+      - ".github/*.yml"
 
 jobs:
   generate_target_matrix:
+    if: false
     runs-on: ubuntu-latest
     outputs:
       target_json: ${{ steps.set_target.outputs.target }}
@@ -89,6 +90,18 @@ jobs:
         with:
           name: ${{ matrix.target }}_output
           path: ./output
+
+  check_all_firmware_builds:
+    needs:
+      - build_firmware
+      - build_firmware_on_arm64
+    runs-on: ubuntu-latest
+    if: |
+      always() &&
+      (needs.build_firmware.result == 'success' || needs.build_firmware.result == 'skipped') &&
+      (needs.build_firmware_on_arm64.result == 'success' || needs.build_firmware_on_arm64.result == 'skipped')
+    steps:
+      - run: echo "All releases built or skipped"
 
   create_release:
     runs-on: ubuntu-latest
