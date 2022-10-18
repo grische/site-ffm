@@ -33,6 +33,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.generate_target_matrix.outputs.build_target_json) }}
     runs-on: ubuntu-latest
+    # Only build if the matrix is not empty
+    if: |
+      needs.generate_target_matrix.outputs.build_target_json != ''
+      && needs.generate_target_matrix.outputs.build_target_json != '[]'
     steps:
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
@@ -69,6 +73,10 @@ jobs:
       matrix:
         target: ["x86-64"]
     runs-on: "ARM64"
+    # Only build if the matrix is not empty
+    if: |
+      needs.generate_target_matrix.outputs.build_target_json != ''
+      && needs.generate_target_matrix.outputs.build_target_json != '[]'
     steps:
       - name: Checkout
         uses: actions/checkout@master
@@ -89,6 +97,19 @@ jobs:
         with:
           name: ${{ matrix.target }}_output
           path: ./output
+
+  check_all_firmware_builds:
+    needs:
+      - build_firmware
+      - build_firmware_on_arm64
+    runs-on: ubuntu-latest
+    # the always() is required to run this job even if previous jobs were skipped
+    if: |
+      always()
+      && (needs.build_firmware.result == 'success' || needs.build_firmware.result == 'skipped')
+      && (needs.build_firmware_on_arm64.result == 'success' || needs.build_firmware_on_arm64.result == 'skipped')
+    steps:
+      - run: echo "All releases built or skipped"
 
   create_release:
     runs-on: ubuntu-latest
