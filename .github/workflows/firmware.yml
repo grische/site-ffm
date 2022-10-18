@@ -6,11 +6,6 @@ on:
     tags:
       - v*
   pull_request:
-    paths-ignore:
-      - "**.md"
-      - "**/CODEOWNERS"
-      - ".github/ISSUE_TEMPLATE"
-      - ".github/*.yml"
 
 jobs:
   generate_target_matrix:
@@ -19,8 +14,20 @@ jobs:
       target_json: ${{ steps.set_target.outputs.target }}
       build_target_json: ${{ steps.set_target.outputs.build_target }}
     steps:
+      # Only build firmware if code related to firmware has been modified
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            non_firmware_changes:
+              - "**.md"
+              - "**/CODEOWNERS"
+              - ".github/ISSUE_TEMPLATE"
+              - ".github/*.yml"
+
       - name: Set target matrix
         id: set_target
+        if: steps.changes.outputs.non_firmware_changes == 'false'
         shell: bash
         run: |
           target_list="[\"ath79-generic\", \"ath79-nand\", \"bcm27xx-bcm2708\", \"bcm27xx-bcm2709\", \"bcm27xx-bcm2710\", \"bcm27xx-bcm2711\", \"ipq40xx-generic\", \"ipq806x-generic\", \"lantiq-xway\", \"lantiq-xrx200\", \"mediatek-mt7622\", \"mpc85xx-p1010\", \"mpc85xx-p1020\", \"mvebu-cortexa9\", \"ramips-mt7620\", \"ramips-mt7621\", \"ramips-mt76x8\", \"rockchip-armv8\", \"sunxi-cortexa7\", \"x86-64\", \"x86-generic\", \"x86-geode\", \"x86-legacy\"]"
