@@ -1,9 +1,8 @@
-GLUON_MULTIDOMAIN=1
+#GLUON_MULTIDOMAIN=1
 GLUON_DEPRECATED=upgrade
 
 GLUON_FEATURES := \
 	autoupdater \
-	config-mode-domain-select \
 	config-mode-geo-location-osm \
 	config-mode-mesh-vpn \
 	ebtables-filter-multicast \
