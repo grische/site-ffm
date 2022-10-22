@@ -21,7 +21,6 @@ GLUON_SITE_PACKAGES := \
 	ffho-autoupdater-wifi-fallback \
 	ffho-web-ap-timer \
 	ffmuc-autoupdater-next2stable \
-	ffmuc-mesh-vpn-wireguard-vxlan \
 	ffmuc-simple-radv-filter \
 	iwinfo \
 	respondd-module-airtime
