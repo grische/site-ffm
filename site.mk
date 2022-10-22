@@ -16,15 +16,7 @@ GLUON_FEATURES := \
 	web-private-wifi \
 	web-wizard
 
-GLUON_SITE_PACKAGES := \
-	ffho-ap-timer \
-	ffho-autoupdater-wifi-fallback \
-	ffho-web-ap-timer \
-	ffmuc-autoupdater-next2stable \
-	ffmuc-mesh-vpn-wireguard-vxlan \
-	ffmuc-simple-radv-filter \
-	iwinfo \
-	respondd-module-airtime
+GLUON_SITE_PACKAGES := iwinfo
 
 # Variables set with ?= can be overwritten from the command line
 
