@@ -36,18 +36,18 @@ jobs:
       matrix: ${{ fromJson(needs.generate_target_matrix.outputs.build_target_json) }}
     runs-on: ubuntu-latest
     steps:
-      - name: Maximize build space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
+      # - name: Maximize build space
+      #   run: |
+      #     sudo rm -rf /usr/share/dotnet
+      #     sudo rm -rf /usr/local/lib/android
+      #     sudo rm -rf /opt/ghc
       - name: Checkout
         uses: actions/checkout@master
         with:
           fetch-depth: 0
-      - name: Install build dependencies
-        run: |
-          sudo -E ./scripts/install_build_dependencies.sh
+      # - name: Install build dependencies
+      #   run: |
+      #     sudo -E ./scripts/install_build_dependencies.sh
       # - name: pre-build without ffmuc-mesh-vpn-wireguard-vxlan (workaround for x86-64)
       #   if: matrix.target == 'x86-64'
       #   run: |
