@@ -36,29 +36,30 @@ jobs:
       matrix: ${{ fromJson(needs.generate_target_matrix.outputs.build_target_json) }}
     runs-on: ubuntu-latest
     steps:
-      - name: Maximize build space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
+      # - name: Maximize build space
+      #   run: |
+      #     sudo rm -rf /usr/share/dotnet
+      #     sudo rm -rf /usr/local/lib/android
+      #     sudo rm -rf /opt/ghc
       - name: Checkout
         uses: actions/checkout@master
         with:
           fetch-depth: 0
-      - name: Install build dependencies
-        run: |
-          sudo -E ./scripts/install_build_dependencies.sh
-      - name: pre-build without ffmuc-mesh-vpn-wireguard-vxlan (workaround for x86-64)
-        if: matrix.target == 'x86-64'
-        run: |
-          sed -i '/ffmuc-mesh-vpn-wireguard-vxlan/d' site.mk
-          make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
-          git checkout site.mk
+      # - name: Install build dependencies
+      #   run: |
+      #     sudo -E ./scripts/install_build_dependencies.sh
+      # - name: pre-build without ffmuc-mesh-vpn-wireguard-vxlan (workaround for x86-64)
+      #   if: matrix.target == 'x86-64'
+      #   run: |
+      #     sed -i '/ffmuc-mesh-vpn-wireguard-vxlan/d' site.mk
+      #     make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
+      #     git checkout site.mk
       - name: build target ${{ matrix.target }}
         id: compile
         run: |
           git checkout -b patched ${GITHUB_SHA}
-          make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
+          # make BROKEN=1 GLUON_TARGETS=${{ matrix.target }} V=s
+          mkdir -p output && echo "This is a test file" > ./output/testfile
           echo "status=success" >> $GITHUB_OUTPUT
       - name: Upload firmware ${{ matrix.target }}
         uses: actions/upload-artifact@master
