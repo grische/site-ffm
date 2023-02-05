@@ -89,6 +89,7 @@ jobs:
         with:
           # Note: If there is no release name specified, releases created in
           # the GitHub UI do not trigger a failure and are modified instead.
+          body: "Stable Release"
           draft: false
           prerelease: false
           generate_release_notes: true
