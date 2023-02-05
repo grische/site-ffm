@@ -100,11 +100,11 @@ jobs:
       - name: Create tar.gz files
         run: |
           set -x
-          for output in */_output; do
+          for output in *_output; do
             tar zcvf "${output}.tar.gz" "${output}"
           done
           ls -alh *.gz
-          for output in */_output; do
+          for output in *_output; do
             tar cvfJ "${output}.tar.xz" "${output}"
           done
           ls -alh *.xz
