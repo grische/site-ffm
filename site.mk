@@ -4,7 +4,6 @@ GLUON_DEPRECATED=upgrade
 GLUON_FEATURES := \
 	autoupdater \
 	config-mode-domain-select \
-	config-mode-geo-location-osm \
 	config-mode-mesh-vpn \
 	ebtables-filter-multicast \
 	ebtables-filter-ra-dhcp \
@@ -13,19 +12,29 @@ GLUON_FEATURES := \
 	respondd \
 	status-page \
 	web-advanced \
-	web-private-wifi \
 	web-wizard
+
+# exclude some packages for "tiny" devices (with little Flash or RAM)
+GLUON_FEATURES_standard := \
+	config-mode-geo-location-osm \
+	web-private-wifi
+
+GLUON_FEATURES_tiny := \
+	config-mode-geo-location
 
 GLUON_SITE_PACKAGES := \
 	ffac-ssid-changer \
-	ffho-ap-timer \
 	ffho-autoupdater-wifi-fallback \
-	ffho-web-ap-timer \
 	ffmuc-autoupdater-next2stable \
 	ffmuc-mesh-vpn-wireguard-vxlan \
 	ffmuc-simple-radv-filter \
 	iwinfo \
 	respondd-module-airtime
+
+# exclude some packages for "tiny" devices (with little Flash or RAM)
+GLUON_SITE_PACKAGES_standard := \
+	ffho-ap-timer \
+	ffho-web-ap-timer \
 
 DEFAULT_GLUON_RELEASE := v2022.10.1~exp$(shell date '+%Y%m%d%H')
 
