@@ -219,6 +219,7 @@ for target in [
     "mpc85xx-p1010",
     "mpc85xx-p1020",
     "mvebu-cortexa9",
+    "realtek-rtl838x",
     "rockchip-armv8",
     "sunxi-cortexa7",
 ]:
