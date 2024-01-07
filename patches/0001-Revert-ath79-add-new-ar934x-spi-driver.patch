@@ -1,0 +1,151 @@
+From 1eb13ee5f7a2c5c5257a575b11f91bd41e14b5bb Mon Sep 17 00:00:00 2001
+From: Grische <2787581+grische@users.noreply.github.com>
+Date: Sun, 7 Jan 2024 21:47:28 +0100
+Subject: [PATCH] Revert "ath79: add new ar934x spi driver"
+
+---
+ ...vert-ath79-add-new-ar934x-spi-driver.patch | 100 ++++++++++++++++++
+ ...10-fix-error-because-AR934X-is-unset.patch |  24 +++++
+ 2 files changed, 124 insertions(+)
+ create mode 100644 patches/openwrt/0016-Revert-ath79-add-new-ar934x-spi-driver.patch
+ create mode 100644 patches/openwrt/0017-config-5.10-fix-error-because-AR934X-is-unset.patch
+
+diff --git a/patches/openwrt/0016-Revert-ath79-add-new-ar934x-spi-driver.patch b/patches/openwrt/0016-Revert-ath79-add-new-ar934x-spi-driver.patch
+new file mode 100644
+index 00000000..32391be7
+--- /dev/null
++++ b/patches/openwrt/0016-Revert-ath79-add-new-ar934x-spi-driver.patch
+@@ -0,0 +1,100 @@
++From d40b7294a3440d039b0bd49914cd228e87d32c26 Mon Sep 17 00:00:00 2001
++From: Grische <2787581+grische@users.noreply.github.com>
++Date: Sun, 7 Jan 2024 21:25:44 +0100
++Subject: [PATCH] Revert "ath79: add new ar934x spi driver"
++
++This reverts commit ebf0d8dadeca443121f4f597c51bf6591e341caf.
++---
++ target/linux/ath79/config-5.10      | 1 -
++ target/linux/ath79/dts/ar934x.dtsi  | 3 ++-
++ target/linux/ath79/dts/qca953x.dtsi | 5 +++--
++ target/linux/ath79/dts/qca955x.dtsi | 5 +++--
++ target/linux/ath79/dts/qca956x.dtsi | 5 +++--
++ 5 files changed, 11 insertions(+), 8 deletions(-)
++
++diff --git a/target/linux/ath79/config-5.10 b/target/linux/ath79/config-5.10
++index dcbc5d4570..34a82b77eb 100644
++--- a/target/linux/ath79/config-5.10
+++++ b/target/linux/ath79/config-5.10
++@@ -178,7 +178,6 @@ CONFIG_SERIAL_AR933X_NR_UARTS=2
++ CONFIG_SERIAL_MCTRL_GPIO=y
++ CONFIG_SERIAL_OF_PLATFORM=y
++ CONFIG_SPI=y
++-CONFIG_SPI_AR934X=y
++ CONFIG_SPI_ATH79=y
++ CONFIG_SPI_BITBANG=y
++ CONFIG_SPI_GPIO=y
++diff --git a/target/linux/ath79/dts/ar934x.dtsi b/target/linux/ath79/dts/ar934x.dtsi
++index d88c7bfabc..687910fd7d 100644
++--- a/target/linux/ath79/dts/ar934x.dtsi
+++++ b/target/linux/ath79/dts/ar934x.dtsi
++@@ -199,10 +199,11 @@
++ 		};
++ 
++ 		spi: spi@1f000000 {
++-			compatible = "qca,ar934x-spi";
+++			compatible = "qca,ar9340-spi", "qca,ar7100-spi";
++ 			reg = <0x1f000000 0x1c>;
++ 
++ 			clocks = <&pll ATH79_CLK_AHB>;
+++			clock-names = "ahb";
++ 
++ 			#address-cells = <1>;
++ 			#size-cells = <0>;
++diff --git a/target/linux/ath79/dts/qca953x.dtsi b/target/linux/ath79/dts/qca953x.dtsi
++index 745c736b74..68122c8405 100644
++--- a/target/linux/ath79/dts/qca953x.dtsi
+++++ b/target/linux/ath79/dts/qca953x.dtsi
++@@ -207,10 +207,11 @@
++ 		};
++ 
++ 		spi: spi@1f000000 {
++-			compatible = "qca,ar934x-spi";
++-			reg = <0x1f000000 0x1c>;
+++			compatible = "qca,ar9530-spi", "qca,ar7100-spi";
+++			reg = <0x1f000000 0x10>;
++ 
++ 			clocks = <&pll ATH79_CLK_AHB>;
+++			clock-names = "ahb";
++ 
++ 			status = "disabled";
++ 
++diff --git a/target/linux/ath79/dts/qca955x.dtsi b/target/linux/ath79/dts/qca955x.dtsi
++index b6e08f9f12..2685ec15de 100644
++--- a/target/linux/ath79/dts/qca955x.dtsi
+++++ b/target/linux/ath79/dts/qca955x.dtsi
++@@ -309,10 +309,11 @@
++ 		};
++ 
++ 		spi: spi@1f000000 {
++-			compatible = "qca,ar934x-spi";
++-			reg = <0x1f000000 0x1c>;
+++			compatible = "qca,ar9557-spi", "qca,ar7100-spi";
+++			reg = <0x1f000000 0x10>;
++ 
++ 			clocks = <&pll ATH79_CLK_AHB>;
+++			clock-names = "ahb";
++ 
++ 			status = "disabled";
++ 
++diff --git a/target/linux/ath79/dts/qca956x.dtsi b/target/linux/ath79/dts/qca956x.dtsi
++index f2452e9dc7..abf5e40fb0 100644
++--- a/target/linux/ath79/dts/qca956x.dtsi
+++++ b/target/linux/ath79/dts/qca956x.dtsi
++@@ -228,10 +228,11 @@
++ 		};
++ 
++ 		spi: spi@1f000000 {
++-			compatible = "qca,ar934x-spi";
++-			reg = <0x1f000000 0x1c>;
+++			compatible = "qca,qca9560-spi", "qca,ar7100-spi";
+++			reg = <0x1f000000 0x10>;
++ 
++ 			clocks = <&pll ATH79_CLK_AHB>;
+++			clock-names = "ahb";
++ 
++ 			status = "disabled";
++ 
++-- 
++2.34.1
++
+diff --git a/patches/openwrt/0017-config-5.10-fix-error-because-AR934X-is-unset.patch b/patches/openwrt/0017-config-5.10-fix-error-because-AR934X-is-unset.patch
+new file mode 100644
+index 00000000..c471266b
+--- /dev/null
++++ b/patches/openwrt/0017-config-5.10-fix-error-because-AR934X-is-unset.patch
+@@ -0,0 +1,24 @@
++From 5ec81e7a9118cb48439c60a9ae080a386e39a996 Mon Sep 17 00:00:00 2001
++From: Grische <2787581+grische@users.noreply.github.com>
++Date: Sun, 7 Jan 2024 21:45:51 +0100
++Subject: [PATCH] config-5.10: fix error because AR934X is unset
++
++---
++ target/linux/ath79/config-5.10 | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/target/linux/ath79/config-5.10 b/target/linux/ath79/config-5.10
++index 34a82b77eb..6a97f79cba 100644
++--- a/target/linux/ath79/config-5.10
+++++ b/target/linux/ath79/config-5.10
++@@ -178,6 +178,7 @@ CONFIG_SERIAL_AR933X_NR_UARTS=2
++ CONFIG_SERIAL_MCTRL_GPIO=y
++ CONFIG_SERIAL_OF_PLATFORM=y
++ CONFIG_SPI=y
+++# CONFIG_SPI_AR934X is not set
++ CONFIG_SPI_ATH79=y
++ CONFIG_SPI_BITBANG=y
++ CONFIG_SPI_GPIO=y
++-- 
++2.34.1
++
+-- 
+2.34.1
+
