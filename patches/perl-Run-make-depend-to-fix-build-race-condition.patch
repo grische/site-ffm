@@ -1,0 +1,96 @@
+From c57dfd7cc429854ed863b385cbb9ab68e6a75699 Mon Sep 17 00:00:00 2001
+From: Christian Schmidbauer <cschmidbauer@genesiscloud.com>
+Date: Fri, 8 Mar 2024 13:59:11 +0100
+Subject: [PATCH] perl: Run make depend to fix build race condition
+
+---
+ ...e-depend-to-fix-build-race-condition.patch | 45 +++++++++++++++++++
+ ...t-build-in-parallel-and-bump-release.patch | 24 ----------
+ 2 files changed, 45 insertions(+), 24 deletions(-)
+ create mode 100644 patches/packages/packages/0001-perl-Run-make-depend-to-fix-build-race-condition.patch
+ delete mode 100644 patches/packages/packages/0001-perl-don-t-build-in-parallel-and-bump-release.patch
+
+diff --git a/patches/packages/packages/0001-perl-Run-make-depend-to-fix-build-race-condition.patch b/patches/packages/packages/0001-perl-Run-make-depend-to-fix-build-race-condition.patch
+new file mode 100644
+index 00000000..7b4edbdd
+--- /dev/null
++++ b/patches/packages/packages/0001-perl-Run-make-depend-to-fix-build-race-condition.patch
+@@ -0,0 +1,45 @@
++From 61d6be29dc678e1a2e9bdb82a94cd30a93977962 Mon Sep 17 00:00:00 2001
++From: Andreas Gnau <andreas.gnau@iopsys.eu>
++Date: Tue, 5 Mar 2024 19:30:09 +0100
++Subject: [PATCH] perl: Run make depend to fix build race condition
++
++Run make depend before building perl. This fixes parallel build failures
++on machines with a high number of cores.
++
++Example error 1:
++
++    /bin/ln -s /build/staging_dir/hostpkg/usr/bin/generate_uudmap generate_uidmap
++    make[5]: ./generate_uudmap: Command not found
++    make[5]: *** [Makefile:321: bitcount.h] Error 127
++
++Example error 2:
++
++    /bin/ln -s /build/staging_dir/hostpkg/usr/bin/generate_uudmap generate_udmap
++    ./generate_uudmap uudmap.h bitcount.h mg_data.h
++    /bin/ln: failed to create symbolic link 'generate_uudmap': File exists
++    make[5]: *** [Makefile:325: generate_uudmap] Error 1
++
++Link: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=996953
++Link: https://salsa.debian.org/perl-team/interpreter/perl/-/commit/366bc98c916a3455f15c532aa33a5636d2fe2803
++Closes: https://github.com/openwrt/packages/issues/8238
++Signed-off-by: Andreas Gnau <andreas.gnau@iopsys.eu>
++---
++ lang/perl/Makefile | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/lang/perl/Makefile b/lang/perl/Makefile
++index afd82997fe..691bcb515f 100644
++--- a/lang/perl/Makefile
+++++ b/lang/perl/Makefile
++@@ -117,6 +117,8 @@ define Build/Configure
++ endef
++ 
++ define Build/Compile
+++	# make depend is required to avoid race conditions: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=996953
+++	+$(MAKE) -C $(PKG_BUILD_DIR) depend
++ 	+$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR)
++ endef
++ 
++-- 
++2.34.1
++
+diff --git a/patches/packages/packages/0001-perl-don-t-build-in-parallel-and-bump-release.patch b/patches/packages/packages/0001-perl-don-t-build-in-parallel-and-bump-release.patch
+deleted file mode 100644
+index 35c03582..00000000
+--- a/patches/packages/packages/0001-perl-don-t-build-in-parallel-and-bump-release.patch
++++ /dev/null
+@@ -1,24 +0,0 @@
+-From: Martin Weinelt <martin@darmstadt.freifunk.net>
+-Date: Tue, 8 Feb 2022 21:09:20 +0100
+-Subject: perl: don't build in parallel and bump release
+-
+-Parallel builds cause spurious build failures with high core counts.
+-
+-https://github.com/openwrt/packages/issues/8238
+-https://github.com/openwrt/packages/pull/17274
+-
+-diff --git a/lang/perl/Makefile b/lang/perl/Makefile
+-index 99302cb1a4414c309b238342d3f1b8bc7f43dd47..66c6ce7aaf342e404b8d9a133a7e396d0108a31f 100644
+---- a/lang/perl/Makefile
+-+++ b/lang/perl/Makefile
+-@@ -34,8 +34,8 @@ PKG_BUILD_DIR:=$(BUILD_DIR)/perl/$(PKG_NAME)-$(PKG_VERSION)
+- HOST_BUILD_DIR:=$(BUILD_DIR_HOST)/perl/$(PKG_NAME)-$(PKG_VERSION)
+- PKG_INSTALL:=1
+- PKG_BUILD_DEPENDS:=perl/host
+--PKG_BUILD_PARALLEL:=1
+--HOST_BUILD_PARALLEL:=1
+-+PKG_BUILD_PARALLEL:=0
+-+HOST_BUILD_PARALLEL:=0
+- 
+- # Variables used during configuration/build
+- HOST_PERL_PREFIX:=$(STAGING_DIR_HOSTPKG)/usr
+-- 
+2.34.1
+
