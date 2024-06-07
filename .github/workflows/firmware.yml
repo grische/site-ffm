@@ -46,7 +46,7 @@ jobs:
         id: set_gluon_ref
         shell: bash
         run: |
-          set -eEo pipefail
+          cat gluon-git-ref # run it here to catch errors
           echo "gluon_git_ref=$(cat gluon-git-ref | tr -d '\n')" | tee -a $GITHUB_OUTPUT
       - name: Checkout Gluon
         uses: actions/checkout@v4
@@ -59,8 +59,7 @@ jobs:
         id: set_gluon_tag
         shell: bash
         run: |
-          git describe --tags --always
-          git describe --tags --abbrev=0
+          git describe --tags --abbrev=0 # run it here to catch errors
           echo "gluon_git_tag=$(git describe --tags --abbrev=0)" | tee -a $GITHUB_OUTPUT
 
   build_firmware:
@@ -74,11 +73,11 @@ jobs:
     container:
       image: ghcr.io/freifunk-gluon/gluon-build:${{ needs.get_gluon_tag.outputs.closest_gluon_tag }}
     steps:
-      - name: Maximize build space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
+      # - name: Maximize build space
+      #   run: |
+      #     sudo rm -rf /usr/share/dotnet
+      #     sudo rm -rf /usr/local/lib/android
+      #     sudo rm -rf /opt/ghc
       - name: Checkout
         uses: actions/checkout@v4
         with:
