@@ -46,19 +46,20 @@ jobs:
         id: set_gluon_ref
         shell: bash
         run: |
+          set -o pipefail
           echo "gluon_git_ref=$(cat gluon-git-ref | tr -d '\n')" | tee -a $GITHUB_OUTPUT
       - name: Checkout Gluon
         uses: actions/checkout@v4
         with:
           repository: 'freifunk-gluon/gluon'
           ref: ${{ steps.set_gluon_ref.outputs.gluon_git_tag }}
+          depth: 0
           fetch-tags: true
       - name: Set Gluon tag
         id: set_gluon_tag
         shell: bash
         run: |
-          ls -al
-          git describe --tags
+          set -o pipefail
           echo "gluon_git_tag=$(git describe --tags --abbrev=0)" | tee -a $GITHUB_OUTPUT
 
   build_firmware:
