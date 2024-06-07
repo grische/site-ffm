@@ -53,14 +53,14 @@ jobs:
         with:
           repository: 'freifunk-gluon/gluon'
           ref: ${{ steps.set_gluon_ref.outputs.gluon_git_tag }}
-          depth: 0
+          fetch-depth: 0
           fetch-tags: true
       - name: Set Gluon tag
         id: set_gluon_tag
         shell: bash
         run: |
           git describe --tags --always
-          set -eEo pipefail
+          git describe --tags --abbrev=0
           echo "gluon_git_tag=$(git describe --tags --abbrev=0)" | tee -a $GITHUB_OUTPUT
 
   build_firmware:
