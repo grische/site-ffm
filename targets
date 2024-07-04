@@ -1,3 +1,5 @@
+armsr-armv7
+armsr-armv8
 ath79-generic
 ath79-mikrotik
 ath79-nand
@@ -10,6 +12,7 @@ ipq40xx-mikrotik
 ipq806x-generic
 lantiq-xrx200
 lantiq-xway
+mediatek-filogic
 mediatek-mt7622
 mpc85xx-p1010
 mpc85xx-p1020
