@@ -21,9 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # - name: Extract branch name
+      #   shell: bash
+      #   run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+      #   id: extract_branch
+
       - name: Get update branch name
         id: branch-name
-        run: echo "branch-name=update-targets-${{ github.event.inputs.branch }}" >> $GITHUB_OUTPUT
+        run: echo "branch-name=update-targets-${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
       - name: Run update-targets
         run: make update-targets
@@ -36,15 +41,15 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6.1.0
         with:
-          title: '[${{ github.event.inputs.branch }}] Update targets'
+          title: '[${{ github.ref_name }}] Update targets'
           body: |
-            Updated targets for branch ${{ github.event.inputs.branch }}
+            Updated targets for branch ${{ github.ref_name }}
 
             New targets: `${{ steps.new-targets.outputs.names }}`
 
             Please trigger the CI before merging this pull request.
           commit-message: "targets: add ${{ steps.new-targets.outputs.names }}"
           branch: ${{ steps.branch-name.outputs.branch-name }}
-          labels: ${{ github.event.inputs.branch }}
+          labels: ${{ github.ref_name }}
           draft: true # this step does not trigger a CI run, so always mark them as draft
           delete-branch: true
