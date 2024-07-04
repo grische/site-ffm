@@ -19,7 +19,7 @@ jobs:
   update-Modules:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@4
+      - uses: actions/checkout@v4
 
       - name: Get update branch name
         id: branch-name
