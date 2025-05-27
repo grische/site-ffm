@@ -1,0 +1,23 @@
+From 653bdbb70bf54566728e05751ff554b00b3e35b1 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Tue, 27 May 2025 21:47:46 +0200
+Subject: [PATCH 2/2] ipq806x-generic: use ath10k-ct for WS-AP3935i
+
+---
+ targets/ipq806x-generic | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/targets/ipq806x-generic b/targets/ipq806x-generic
+index 43bdb68f..31d4c13b 100644
+--- a/targets/ipq806x-generic
++++ b/targets/ipq806x-generic
+@@ -43,5 +43,5 @@ device('ubiquiti-unifi-ac-hd', 'ubnt_unifi-ac-hd', {
+ device('extreme-networks-ws-ap3935i', 'extreme_ap3935', {
+ 	factory = false,
+ 	sysupgrade = '-squashfs-nand-sysupgrade',
+-	packages = QCA9984_PACKAGES,
++	packages = QCA9980_PACKAGES, -- crashes with ath10k
+ })
+-- 
+2.34.1
+

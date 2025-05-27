@@ -1,0 +1,49 @@
+From 2cd8d71bc2b2cf21c98d1f520d23d7787a75f117 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Tue, 27 May 2025 19:48:38 +0200
+Subject: [PATCH] ipq806x-generic: add Extreme Networks WS-AP3935i
+
+---
+ docs/user/supported_devices.rst |  4 ++++
+ targets/ipq806x-generic         | 13 +++++++++++++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/docs/user/supported_devices.rst b/docs/user/supported_devices.rst
+index ed6e33fc..b0b8372b 100644
+--- a/docs/user/supported_devices.rst
++++ b/docs/user/supported_devices.rst
+@@ -268,6 +268,10 @@ ipq40xx-mikrotik
+ ipq806x-generic
+ ---------------
+ 
++* Extreme Networks
++
++  - AP3935
++
+ * NETGEAR
+ 
+   - R7800
+diff --git a/targets/ipq806x-generic b/targets/ipq806x-generic
+index 0abf67a7..43bdb68f 100644
+--- a/targets/ipq806x-generic
++++ b/targets/ipq806x-generic
+@@ -32,3 +32,16 @@ device('ubiquiti-unifi-ac-hd', 'ubnt_unifi-ac-hd', {
+ 	packages = QCA9984_PACKAGES,
+ 	factory = false,
+ })
++
++
++--
++-- QCA9990
++--
++
++-- Extreme Networks
++
++device('extreme-networks-ws-ap3935i', 'extreme_ap3935', {
++	factory = false,
++	sysupgrade = '-squashfs-nand-sysupgrade',
++	packages = QCA9984_PACKAGES,
++})
+-- 
+2.34.1
+
