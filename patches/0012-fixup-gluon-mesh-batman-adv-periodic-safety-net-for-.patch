@@ -1,0 +1,31 @@
+From 0af19618c999f26c8b36a7339462be9261a93454 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Fri, 5 Jun 2026 21:11:33 +0200
+Subject: [PATCH 12/18] fixup! gluon-mesh-batman-adv: periodic safety-net for
+ tunnel-throughput
+
+---
+ .../micron.d/gluon-mesh-batman-adv-tunnel-throughput | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput b/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput
+index e2d48ba8..7f75af6c 100644
+--- a/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput
++++ b/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput
+@@ -1,7 +1,7 @@
+-# Periodic re-evaluation of the tunnel-throughput override. The
+-# hotplug.d/iface handler only fires on netifd ifup/ifdown of the wan
+-# UCI iface; it misses intra-bridge cable moves (multiple role=uplink
+-# ports bridged into one wan iface). This re-runs the worker every
+-# 10 minutes so the override converges within bounded time. The worker
+-# is idempotent and no-ops on Batman-IV.
++# Periodic re-evaluation of the tunnel-throughput override.
++# hotplug.d/iface handler only fires on netifd ifup/ifdown of the wan UCI iface
++# it misses intra-bridge cable moves (multiple role=uplink ports bridged into one
++# wan iface).
++# Re-running the worker every 10 minutes makes sure it converges within bounded time.
++# The worker is idempotent and no-ops on Batman-IV.
+ */10 * * * * ACTION=ifup INTERFACE=wan /lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+-- 
+2.43.0
+

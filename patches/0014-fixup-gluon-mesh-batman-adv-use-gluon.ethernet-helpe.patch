@@ -1,0 +1,44 @@
+From 909023b7766e0e9dc36730c6d3dd450524eaa36a Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Fri, 5 Jun 2026 19:44:03 +0000
+Subject: [PATCH 14/18] fixup! gluon-mesh-batman-adv: use gluon.ethernet helper
+ + idempotent apply
+
+apply_override() skips the batctl write when the kernel's current
+throughput_override already equals the computed value. batman_adv stores
+the override in 100-kbit/s units (0.1 Mbit granularity), so a value that
+is not a whole multiple of 100 kbit -- e.g. an operator bandwidth_limit
+of 512 kbit, stored as 500 -- never compares equal on read-back and is
+rewritten on every tick. Round the target to the nearest 100 kbit
+before comparing and writing; whole-Mbit link speeds are unaffected.
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ .../lib/gluon/mesh-batman-adv/tunnel-throughput.lua    | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+index a0111204..4432da4c 100755
+--- a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
++++ b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+@@ -192,10 +192,16 @@ end
+ -- in exchange for syslog hygiene and correctness.
+ local function apply_override(hardif, value)
+ 	if value == nil then return end
++	-- batman_adv stores throughput_override in 100-kbit/s units (0.1 Mbit
++	-- granularity), so writes are quantized to the nearest 100 kbit. Round
++	-- the target the same way before comparing, otherwise non-whole-Mbit
++	-- values (e.g. an operator bandwidth_limit of 512 kbit, stored as 500)
++	-- would never equal the read-back value and we'd rewrite every tick.
++	local target = math.floor(value / 100 + 0.5) * 100
+ 	local current = read_current_override_kbit(hardif)
+-	if current == value then return end
++	if current == target then return end
+ 
+-	local arg = string.format('%dkbit', value)
++	local arg = string.format('%dkbit', target)
+ 	local rc = os.execute('batctl hardif ' .. hardif
+ 		.. ' throughput_override ' .. arg .. ' 2>/dev/null')
+ 	if rc ~= 0 then
+-- 
+2.43.0
+

@@ -1,0 +1,233 @@
+From b7aeba03860147cb28fa195fdc28f3300e5bb3ba Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Thu, 14 May 2026 09:32:11 +0000
+Subject: [PATCH 07/18] gluon-mesh-batman-adv: detect throughput_override for
+ tunnel hardifs
+
+Batman-V uses link throughput as its routing metric. For physical NICs
+it reads ethtool natively; for tunnel/VPN hardifs (WireGuard, VXLAN)
+the netdev exposes no sysfs link speed, so batman-V falls back to its
+1 Mbit/s default and gateway selection collapses on V meshes that
+include any tunnel hardif.
+
+Add a netifd hotplug.d/iface handler that reads /sys/class/net/<wan>/
+speed on sysconfig.wan_ifname and applies it via batctl as
+throughput_override on each tunnel hardif. Triggers fire on ifup and
+ifdown of the canonical WAN-iface list (wan, wan6, cellular,
+cellular_4, matching gluon-wan-dnsmasq) plus mesh_vpn as a boot-
+ordering safety net for the case where the mesh hardif comes up after
+wan. Cable flaps, autoneg renegotiations that cross a carrier loss,
+and DHCP renewals are all caught this way; in-place autoneg flips
+without carrier loss are not.
+
+A tunnel hardif is identified at runtime by the absence of three
+markers: phy80211 / wireless sysfs nodes (wireless, handled by ELP),
+the dummy netdev kind (e.g. primary0), and a positive sysfs speed
+value (physical wired hardifs, handled natively by batman-V's ethtool
+path). The bandwidth ceiling mesh_vpn.limit_{ingress,egress} (kbit/s
+in UCI) is honoured on the mesh-vpn hardif specifically.
+
+PPPoE/cellular WAN netdevs whose sysfs speed is unreadable, and
+multi-WAN policy-routed setups where WG egresses elsewhere, leave the
+batman-V 1 Mbit/s default in place; operators set throughput_override
+manually for those.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+---
+ ...40-gluon-mesh-batman-adv-tunnel-throughput |  17 ++
+ .../mesh-batman-adv/tunnel-throughput.lua     | 159 ++++++++++++++++++
+ 2 files changed, 176 insertions(+)
+ create mode 100644 package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput
+ create mode 100755 package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+
+diff --git a/package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput b/package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput
+new file mode 100644
+index 00000000..0c92f830
+--- /dev/null
++++ b/package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput
+@@ -0,0 +1,17 @@
++# shellcheck shell=sh disable=SC2154
++#
++# Sourced by /sbin/hotplug-call. $ACTION and $INTERFACE come from netifd.
++# Early-exit on irrelevant events before spawning lua; this file is
++# sourced for every iface event on the system.
++
++case "${ACTION}" in
++	ifup|ifdown) ;;
++	*) return ;;
++esac
++
++case "${INTERFACE}" in
++	wan|wan6|cellular|cellular_4|mesh_vpn) ;;
++	*) return ;;
++esac
++
++/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+diff --git a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+new file mode 100755
+index 00000000..e67e579f
+--- /dev/null
++++ b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+@@ -0,0 +1,159 @@
++#!/usr/bin/lua
++
++-- Apply Batman-V throughput_override to tunnel batadv hardifs (mesh-vpn,
++-- etc.) based on the WAN interface's sysfs link speed. Invoked from the
++-- hotplug.d/iface wrapper, which has already filtered $ACTION and
++-- $INTERFACE.
++--
++-- Triggers:
++--   ifup/ifdown wan/wan6/cellular/cellular_4 -> iterate tunnel hardifs
++--   ifup mesh_vpn                            -> wait for bat0 registration,
++--                                               apply to mesh-vpn only
++
++local sysconfig    = require 'gluon.sysconfig'
++local uci          = require 'simple-uci'
++local util         = require 'gluon.util'
++local posix_stat   = require 'posix.sys.stat'
++local posix_syslog = require 'posix.syslog'
++local posix_unistd = require 'posix.unistd'
++
++local ACTION    = os.getenv('ACTION')    or ''
++local INTERFACE = os.getenv('INTERFACE') or ''
++local TAG       = 'gluon-batadv-tpo'
++
++posix_syslog.openlog(TAG, 0, posix_syslog.LOG_DAEMON)
++
++local function log(msg)
++	posix_syslog.syslog(posix_syslog.LOG_INFO,
++		INTERFACE .. ' ' .. ACTION .. ': ' .. msg)
++end
++
++local function warn(msg)
++	posix_syslog.syslog(posix_syslog.LOG_WARNING,
++		INTERFACE .. ' ' .. ACTION .. ': ' .. msg)
++end
++
++-- Batman-V only. /sys/module/.../routing_algo is a terse one-liner
++-- ("BATMAN_V" or "BATMAN_IV"); avoids parsing batctl's verbose output.
++local routing_algo = util.readfile('/sys/module/batman_adv/parameters/routing_algo')
++if not routing_algo or util.trim(routing_algo) ~= 'BATMAN_V' then
++	os.exit(0)
++end
++
++-- Sysfs link speed in kbit/s; nil if unknown or non-positive.
++local function sysfs_speed_kbit(iface)
++	local s = util.readfile('/sys/class/net/' .. iface .. '/speed')
++	if not s then return nil end
++	local n = tonumber(util.trim(s))
++	if not n or n <= 0 then return nil end
++	return n * 1000
++end
++
++local function is_wireless(iface)
++	return posix_stat.stat('/sys/class/net/' .. iface .. '/phy80211') ~= nil
++end
++
++-- Collect batadv hardifs (= bat0's lower_* symlinks) that need an
++-- override: not wireless, not the internal dummy, no native sysfs speed.
++local function tunnel_hardifs()
++	local result = {}
++	for _, link in ipairs(util.glob('/sys/class/net/bat0/lower_*')) do
++		local iface = link:match('/lower_(.+)$')
++		-- primary0 is the dummy hardif that carries bat0's MAC -- it has
++		-- no neighbours and never carries traffic, so an override there
++		-- would be cosmetic noise.
++		if iface
++			and iface ~= 'primary0'
++			and not is_wireless(iface)
++			and not sysfs_speed_kbit(iface) then
++			result[#result + 1] = iface
++		end
++	end
++	return result
++end
++
++-- Wait up to ~30s for the hardif to be registered with batadv. The
++-- 30-gluon-mesh-batman-adv post-setup.d issues an async ubus renew that
++-- adds the hardif; on slow boots under ubus contention this can lag
++-- past 10s. Only used in the mesh_vpn ifup branch.
++local function wait_for_hardif(iface)
++	for _ = 1, 30 do
++		if posix_stat.stat('/sys/class/net/bat0/lower_' .. iface) then
++			return true
++		end
++		posix_unistd.sleep(1)
++	end
++	return false
++end
++
++-- Ceiling from operator-configured bandwidth_limit (kbit/s in UCI),
++-- mesh-vpn only. min() is intentional: it handles the typical asymmetric
++-- DSL case (egress is the bottleneck) and conservatively bounds the
++-- batman-V routing decision in both directions.
++local function bandwidth_limit_cap()
++	local c = uci.cursor()
++	if not c:get_bool('gluon', 'mesh_vpn', 'limit_enabled') then return nil end
++	local lin = tonumber(c:get('gluon', 'mesh_vpn', 'limit_ingress'))
++	local leg = tonumber(c:get('gluon', 'mesh_vpn', 'limit_egress'))
++	if not lin or not leg or lin <= 0 or leg <= 0 then return nil end
++	return math.min(lin, leg)
++end
++
++-- Compute the override to apply now. Returns kbit/s on ifup if WAN sysfs
++-- has a positive speed, 0 on ifdown, or nil if we should leave whatever
++-- is set alone (WAN unreadable -> no good answer).
++local function compute_override(hardif)
++	if ACTION == 'ifdown' then return 0 end
++	local wan = sysconfig.wan_ifname
++	if not wan or wan == '' then
++		warn('sysconfig.wan_ifname empty; cannot apply')
++		return nil
++	end
++	local speed = sysfs_speed_kbit(wan)
++	if not speed then
++		warn(hardif .. ': WAN ' .. wan .. ' speed unreadable; leaving default')
++		return nil
++	end
++	if hardif == 'mesh-vpn' then
++		local cap = bandwidth_limit_cap()
++		if cap and cap < speed then
++			log('capping ' .. speed .. ' kbit/s at bandwidth_limit ' .. cap .. ' kbit/s')
++			speed = cap
++		end
++	end
++	return speed
++end
++
++local function apply_override(hardif, value)
++	if value == nil then return end
++	local arg = string.format('%dkbit', value)
++	local rc = os.execute('batctl hardif ' .. hardif
++		.. ' throughput_override ' .. arg .. ' 2>/dev/null')
++	if rc ~= 0 then
++		warn(hardif .. ': batctl throughput_override ' .. arg .. ' failed')
++	else
++		log(hardif .. ': throughput_override = ' .. arg)
++	end
++end
++
++-- --- main ---
++
++-- INTERFACE=mesh_vpn fires on both ifup and ifdown. On ifdown the batadv
++-- hardif is being removed by netifd; no point waiting or clearing.
++-- The netdev "mesh-vpn" (hyphen) is named verbatim by gluon-mesh-vpn-core
++-- (500-mesh-vpn) regardless of provider, so the UCI->hardif mapping is
++-- stable.
++if INTERFACE == 'mesh_vpn' then
++	if ACTION ~= 'ifup' then os.exit(0) end
++	if not wait_for_hardif('mesh-vpn') then
++		warn('mesh-vpn not registered with batadv after 30s; skipping')
++		os.exit(0)
++	end
++	apply_override('mesh-vpn', compute_override('mesh-vpn'))
++	os.exit(0)
++end
++
++-- wan / wan6 / cellular / cellular_4: iterate currently-registered hardifs.
++for _, hardif in ipairs(tunnel_hardifs()) do
++	apply_override(hardif, compute_override(hardif))
++end
+-- 
+2.43.0
+

@@ -1,7 +1,7 @@
 From 0ed9341462b0a7977fb29220e1aa07b4fcb18ed9 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Thu, 30 Apr 2026 17:39:26 +0200
-Subject: [PATCH 3/7] gluon-radv-filterd: fix log in update_metrics
+Subject: [PATCH 03/18] gluon-radv-filterd: fix log in update_metrics
 
 The error message is in the local translation table query, not the global
 one.

@@ -1,0 +1,26 @@
+From 2d5a8b62c39770b1b382e6b570521092dca76e97 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Fri, 5 Jun 2026 21:11:33 +0200
+Subject: [PATCH 13/18] fixup! gluon-mesh-batman-adv: detect
+ throughput_override for tunnel hardifs
+
+---
+ .../iface/40-gluon-mesh-batman-adv-tunnel-throughput          | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput b/package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput
+index 0c92f830..6f133dfc 100644
+--- a/package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput
++++ b/package/gluon-mesh-batman-adv/files/etc/hotplug.d/iface/40-gluon-mesh-batman-adv-tunnel-throughput
+@@ -1,8 +1,4 @@
+ # shellcheck shell=sh disable=SC2154
+-#
+-# Sourced by /sbin/hotplug-call. $ACTION and $INTERFACE come from netifd.
+-# Early-exit on irrelevant events before spawning lua; this file is
+-# sourced for every iface event on the system.
+ 
+ case "${ACTION}" in
+ 	ifup|ifdown) ;;
+-- 
+2.43.0
+

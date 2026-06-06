@@ -1,0 +1,178 @@
+From bbc8d5732dca016f38788febf1a691529ce69f5c Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Fri, 15 May 2026 04:04:31 +0000
+Subject: [PATCH 11/18] gluon-mesh-batman-adv: use gluon.ethernet helper +
+ idempotent apply
+
+Two improvements driven by an architecture review focused on
+long-term maintainability:
+
+(1) Replace the inline sysfs read with gluon.ethernet.get_link_speed_
+    kbit(), which transparently handles the swconfig case where the
+    CPU-side VLAN netdev hides per-port speed. Previously the worker
+    would happily write throughput_override=1000000 on a 100M cable
+    plugged into a LAN port of a swconfig device, biasing batman-V's
+    gateway selection by ~10x. The helper returns the actual
+    bottleneck per-port speed via /etc/board.json + swconfig CLI on
+    swconfig, falling through to sysfs on DSA + direct netdevs.
+
+(2) Read the kernel's actual throughput_override value via batctl
+    before writing, and skip the write when it already matches the
+    computed value. Reasons:
+    * Eliminates redundant batctl netlink calls on every cron tick
+      when nothing has changed (worker fires every 10 min from
+      micrond + on every ifup/ifdown hotplug; ~150 fires per node
+      per day baseline).
+    * Eliminates the matching redundant syslog lines, which at fleet
+      scale becomes meaningful flash wear and buries actual events.
+    * Robust against external modifications: an operator-set value
+      or a concurrent writer (e.g. FFMUC checkuplink) is detected on
+      the next worker run and either preserved if it matches our
+      intent, or overwritten if it doesn't. No state cache means no
+      drift between cache and reality.
+
+The log line on a write now reads "throughput_override <old> kbit ->
+<new>kbit", showing the transition explicitly.
+
+Refused-to-write semantics on unknown speed (active_uplink_speed_kbit
+returns nil) are preserved: better to let batman-V keep its default
+1 Mbit assumption than to lie with a coarse guess.
+
+Architectural note in the worker comment: an RTM_NEWLINK-driven C
+daemon (modelled on gluon-radv-filterd) would replace both the
+hotplug.d wrapper and the micrond fallback with a single
+millisecond-latency listener and is the suggested long-term
+architectural direction; the current script implementation is the
+maintainable interim that ships today.
+
+Verified live on AVM FRITZ!Box 4020 (swconfig, ath79) and Extreme
+AP3935 (no switch, direct netdev): swconfig 100M cable now
+correctly applies 100M override (was 1000M); idempotent re-runs
+produce no syslog noise; external clearing of the override is
+detected and re-applied on the next worker run.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+---
+ .../mesh-batman-adv/tunnel-throughput.lua     | 67 ++++++++++++++-----
+ 1 file changed, 50 insertions(+), 17 deletions(-)
+
+diff --git a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+index d0e1eb5d..a0111204 100755
+--- a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
++++ b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+@@ -10,6 +10,7 @@
+ --   ifup mesh_vpn                            -> wait for bat0 registration,
+ --                                               apply to mesh-vpn only
+ 
++local ethernet     = require 'gluon.ethernet'
+ local uci          = require 'simple-uci'
+ local util         = require 'gluon.util'
+ local posix_stat   = require 'posix.sys.stat'
+@@ -99,8 +100,9 @@ local function bandwidth_limit_cap()
+ end
+ 
+ -- Return the active uplink throughput in kbit/s, walking every gluon
+--- role=uplink interface that has carrier and a readable sysfs speed.
+--- Takes min if multiple are up (conservative bottleneck).
++-- role=uplink interface that has carrier. Takes min if multiple are
++-- up (conservative bottleneck). nil if no carrier-up uplink reports a
++-- usable speed.
+ --
+ -- Gluon's "uplink anywhere" feature lets several physical-port ifaces
+ -- carry role='uplink' (e.g. on the AVM FRITZ!Box 4020 both the dedicated
+@@ -109,29 +111,34 @@ end
+ -- no ifdown/ifup hotplug fires; the worker still reads the right speed
+ -- by walking the role list rather than a single sysconfig.wan_ifname.
+ --
+--- Known limitations:
+---   * Intra-bridge cable moves are not auto-detected (no hotplug fires
+---     while at least one bridge member retains carrier); a periodic
+---     micrond entry (`/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-
+---     throughput`) re-evaluates every 10 minutes as a fallback.
+---   * On swconfig switches the CPU-side VLAN netdev reports the CPU
+---     port's speed (typically 1G) regardless of which physical port the
+---     cable is in. Auto-detection is therefore accurate only on DSA
+---     switches or on the swconfig WAN port specifically.
++-- Per-port speed is queried via gluon.ethernet.get_link_speed_kbit which
++-- handles swconfig (per-port via /etc/board.json + `swconfig dev <sw>
++-- port <N> get link`) and DSA (sysfs is authoritative) transparently.
++-- If no port reports a positive speed we return nil and the caller
++-- declines to write an override rather than guessing.
++--
++-- Known limitation: intra-bridge cable moves are not auto-detected at
++-- the netifd hotplug layer (no ifup/ifdown fires while at least one
++-- bridge member retains carrier). The micrond entry at
++-- /usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput re-evaluates
++-- every 10 minutes as a fallback. A long-term replacement -- a small
++-- RTM_NEWLINK-driven C daemon modelled on gluon-radv-filterd -- would
++-- close the gap with millisecond latency and is the suggested
++-- architectural direction once the prototype stabilises.
+ local function active_uplink_speed_kbit()
+ 	local cursor = uci.cursor()
+ 	local uplink_ifaces = util.get_role_interfaces(cursor, 'uplink')
+ 	local min_speed
+ 	for _, iface in ipairs(uplink_ifaces) do
+ 		-- Skip wireless: a mesh radio with role='uplink' would return
+-		-- garbage/-1 from sysfs and isn't meaningful for tunnel
+-		-- throughput. Also skip non-existent netdevs (uci-configured
+-		-- but not yet created, e.g. USB tethers).
++		-- garbage/-1 and isn't meaningful for tunnel throughput. Also
++		-- skip non-existent netdevs (UCI-configured but not yet
++		-- created, e.g. USB tethers).
+ 		if not is_wireless(iface)
+ 			and posix_stat.stat('/sys/class/net/' .. iface) then
+ 			local carrier = util.readfile('/sys/class/net/' .. iface .. '/carrier')
+ 			if carrier and util.trim(carrier) == '1' then
+-				local speed = sysfs_speed_kbit(iface)
++				local speed = ethernet.get_link_speed_kbit(iface)
+ 				if speed and (not min_speed or speed < min_speed) then
+ 					min_speed = speed
+ 				end
+@@ -161,16 +168,42 @@ local function compute_override(hardif)
+ 	return speed
+ end
+ 
++-- Read the current throughput_override for a hardif and return it as
++-- kbit/s. batctl prints e.g. "0.0 MBit" or "1000.0 MBit"; we extract
++-- the first numeric token and multiply by 1000. Returns nil on error
++-- (hardif missing, batctl unavailable).
++local function read_current_override_kbit(hardif)
++	local f = io.popen('batctl hardif ' .. hardif
++		.. ' throughput_override 2>/dev/null')
++	if not f then return nil end
++	local out = f:read('*a') or ''
++	f:close()
++	local mbit = tonumber((out:match('([%d%.]+)')))
++	if not mbit then return nil end
++	return math.floor(mbit * 1000 + 0.5)
++end
++
++-- Apply override only if the kernel's actual value differs from what
++-- we'd set. Using batctl as the source of truth (rather than a
++-- /var/run state cache) is robust against external modifications --
++-- operator-set values, concurrent writers like FFMUC's checkuplink, or
++-- our own earlier invocation -- and removes a class of state-drift
++-- bugs the cache approach has. Per fire: one extra ~20ms batctl exec,
++-- in exchange for syslog hygiene and correctness.
+ local function apply_override(hardif, value)
+ 	if value == nil then return end
++	local current = read_current_override_kbit(hardif)
++	if current == value then return end
++
+ 	local arg = string.format('%dkbit', value)
+ 	local rc = os.execute('batctl hardif ' .. hardif
+ 		.. ' throughput_override ' .. arg .. ' 2>/dev/null')
+ 	if rc ~= 0 then
+ 		warn(hardif .. ': batctl throughput_override ' .. arg .. ' failed')
+-	else
+-		log(hardif .. ': throughput_override = ' .. arg)
++		return
+ 	end
++	log(hardif .. ': throughput_override ' ..
++		(current and (current .. ' kbit') or '?') .. ' -> ' .. arg)
+ end
+ 
+ -- --- main ---
+-- 
+2.43.0
+

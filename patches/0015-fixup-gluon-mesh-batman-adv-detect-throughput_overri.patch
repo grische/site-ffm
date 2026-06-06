@@ -1,0 +1,190 @@
+From 760b0d5347cbf266a57cc000c6fb0b2782d5c176 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Fri, 5 Jun 2026 19:44:54 +0000
+Subject: [PATCH 15/18] fixup! gluon-mesh-batman-adv: detect
+ throughput_override for tunnel hardifs
+
+tunnel_hardifs() applied the WAN uplink speed to every batadv hardif
+without a native sysfs speed. That is correct for mesh-vpn and the
+mesh-on-WAN hardif vx_mesh_uplink (both ride the uplink), but wrong for
+vx_mesh_other, the mesh-on-LAN hardif that rides a dedicated wired mesh
+port: its throughput is the local link speed, so tagging it with the
+uplink speed misreports batman-V's routing metric.
+
+Keep all the VXLAN hardifs (an override still beats batman-V's 1 Mbit/s
+default) but choose the speed source per hardif: vx_mesh_other takes the
+min carrier-up speed of the role=mesh (non-uplink) ports via the new
+mesh_other_speed_kbit(); mesh-vpn and vx_mesh_uplink keep the uplink
+speed. The shared carrier/speed walk is factored into
+min_link_speed_kbit().
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ .../mesh-batman-adv/tunnel-throughput.lua     | 116 ++++++++++++------
+ 1 file changed, 80 insertions(+), 36 deletions(-)
+
+diff --git a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+index 4432da4c..a5b02327 100755
+--- a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
++++ b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+@@ -1,9 +1,12 @@
+ #!/usr/bin/lua
+ 
+--- Apply Batman-V throughput_override to tunnel batadv hardifs (mesh-vpn,
+--- etc.) based on the WAN interface's sysfs link speed. Invoked from the
+--- hotplug.d/iface wrapper, which has already filtered $ACTION and
+--- $INTERFACE.
++-- Apply Batman-V throughput_override to batadv hardifs that have no
++-- native ethtool/sysfs link speed (mesh-vpn, and the VXLAN wired-mesh
++-- hardifs vx_mesh_uplink/vx_mesh_other) so batman-V does not rate them at
++-- its 1 Mbit/s default. The value depends on what the hardif rides over:
++-- the WAN uplink speed for mesh-vpn and vx_mesh_uplink, the local mesh
++-- port speed for vx_mesh_other. Invoked from the hotplug.d/iface wrapper,
++-- which has already filtered $ACTION and $INTERFACE.
+ --
+ -- Triggers:
+ --   ifup/ifdown wan/wan6/cellular/cellular_4 -> iterate tunnel hardifs
+@@ -62,6 +65,14 @@ local function tunnel_hardifs()
+ 		-- primary0 is the dummy hardif that carries bat0's MAC -- it has
+ 		-- no neighbours and never carries traffic, so an override there
+ 		-- would be cosmetic noise.
++		--
++		-- The VXLAN wired-mesh hardifs are deliberately kept:
++		-- vx_mesh_uplink (mesh-on-WAN, over br-wan) and vx_mesh_other
++		-- (mesh-on-LAN, over a dedicated wired mesh port). Both lack a
++		-- native sysfs speed, so without an override batman-V rates the
++		-- node-to-node link at its 1 Mbit/s default and routing collapses
++		-- over otherwise-fast local links. compute_override() then picks
++		-- the right speed source per hardif (uplink vs. mesh-port speed).
+ 		if iface
+ 			and iface ~= 'primary0'
+ 			and not is_wireless(iface)
+@@ -99,10 +110,36 @@ local function bandwidth_limit_cap()
+ 	return math.min(lin, leg)
+ end
+ 
+--- Return the active uplink throughput in kbit/s, walking every gluon
+--- role=uplink interface that has carrier. Takes min if multiple are
+--- up (conservative bottleneck). nil if no carrier-up uplink reports a
+--- usable speed.
++-- Min carrier-up link speed (kbit/s) across the given netdevs, or nil if
++-- none reports a usable speed (conservative bottleneck when several are
++-- up). Per-port speed comes from gluon.ethernet.get_link_speed_kbit,
++-- which handles swconfig (per-port via /etc/board.json + `swconfig dev
++-- <sw> port <N> get link`) and DSA (sysfs is authoritative) transparently.
++-- Skips wireless (sysfs speed is meaningless there; mesh radios use ELP)
++-- and netdevs that don't exist yet (UCI-configured but not created, e.g.
++-- USB tethers). When nothing is readable we return nil and the caller
++-- declines to write an override rather than guessing.
++local function min_link_speed_kbit(ifaces)
++	local min_speed
++	for _, iface in ipairs(ifaces) do
++		if not is_wireless(iface)
++			and posix_stat.stat('/sys/class/net/' .. iface) then
++			local carrier = util.readfile('/sys/class/net/' .. iface .. '/carrier')
++			if carrier and util.trim(carrier) == '1' then
++				local speed = ethernet.get_link_speed_kbit(iface)
++				if speed and (not min_speed or speed < min_speed) then
++					min_speed = speed
++				end
++			end
++		end
++	end
++	return min_speed
++end
++
++-- Active uplink throughput in kbit/s: min across every carrier-up gluon
++-- role=uplink interface. Used for the hardifs whose path is the WAN
++-- uplink -- mesh-vpn (the VPN tunnel) and vx_mesh_uplink (mesh-on-WAN,
++-- VXLAN over br-wan).
+ --
+ -- Gluon's "uplink anywhere" feature lets several physical-port ifaces
+ -- carry role='uplink' (e.g. on the AVM FRITZ!Box 4020 both the dedicated
+@@ -111,12 +148,6 @@ end
+ -- no ifdown/ifup hotplug fires; the worker still reads the right speed
+ -- by walking the role list rather than a single sysconfig.wan_ifname.
+ --
+--- Per-port speed is queried via gluon.ethernet.get_link_speed_kbit which
+--- handles swconfig (per-port via /etc/board.json + `swconfig dev <sw>
+--- port <N> get link`) and DSA (sysfs is authoritative) transparently.
+--- If no port reports a positive speed we return nil and the caller
+--- declines to write an override rather than guessing.
+---
+ -- Known limitation: intra-bridge cable moves are not auto-detected at
+ -- the netifd hotplug layer (no ifup/ifdown fires while at least one
+ -- bridge member retains carrier). The micrond entry at
+@@ -126,36 +157,49 @@ end
+ -- close the gap with millisecond latency and is the suggested
+ -- architectural direction once the prototype stabilises.
+ local function active_uplink_speed_kbit()
++	return min_link_speed_kbit(util.get_role_interfaces(uci.cursor(), 'uplink'))
++end
++
++-- Throughput of the dedicated wired node-to-node mesh ports -- role=mesh
++-- but not role=uplink -- that back the vx_mesh_other hardif (mesh-on-LAN,
++-- VXLAN over a dedicated wired port; see gluon_wired.sh and
++-- 210-interface-mesh). This is the local link speed (often GbE), which is
++-- unrelated to the WAN uplink and is exactly what batman-V needs so it
++-- does not rate a fast local mesh link at its 1 Mbit/s default and route
++-- horribly over it. The role split mirrors 210-interface-mesh: ifaces
++-- that are mesh *and* uplink go into vx_mesh_uplink (uplink speed); the
++-- rest go here. nil if no such port is carrier-up with a readable speed.
++local function mesh_other_speed_kbit()
+ 	local cursor = uci.cursor()
+-	local uplink_ifaces = util.get_role_interfaces(cursor, 'uplink')
+-	local min_speed
+-	for _, iface in ipairs(uplink_ifaces) do
+-		-- Skip wireless: a mesh radio with role='uplink' would return
+-		-- garbage/-1 and isn't meaningful for tunnel throughput. Also
+-		-- skip non-existent netdevs (UCI-configured but not yet
+-		-- created, e.g. USB tethers).
+-		if not is_wireless(iface)
+-			and posix_stat.stat('/sys/class/net/' .. iface) then
+-			local carrier = util.readfile('/sys/class/net/' .. iface .. '/carrier')
+-			if carrier and util.trim(carrier) == '1' then
+-				local speed = ethernet.get_link_speed_kbit(iface)
+-				if speed and (not min_speed or speed < min_speed) then
+-					min_speed = speed
+-				end
+-			end
++	local is_uplink = {}
++	for _, iface in ipairs(util.get_role_interfaces(cursor, 'uplink')) do
++		is_uplink[iface] = true
++	end
++	local mesh_ifaces = {}
++	for _, iface in ipairs(util.get_role_interfaces(cursor, 'mesh')) do
++		if not is_uplink[iface] then
++			mesh_ifaces[#mesh_ifaces + 1] = iface
+ 		end
+ 	end
+-	return min_speed
++	return min_link_speed_kbit(mesh_ifaces)
+ end
+ 
+--- Compute the override to apply now. Returns kbit/s on ifup if an active
+--- uplink has a positive sysfs speed, 0 on ifdown, or nil if we should
+--- leave whatever is set alone (no readable uplink -> no good answer).
++-- Compute the override to apply now. Returns kbit/s on ifup if the
++-- hardif's underlying link reports a readable speed, 0 on ifdown, or nil
++-- if we should leave whatever is set alone (no readable speed -> no good
++-- answer). The speed source depends on what the hardif rides over:
++-- vx_mesh_other rides a dedicated wired mesh port (mesh-port speed);
++-- mesh-vpn and vx_mesh_uplink ride the WAN uplink (uplink speed).
+ local function compute_override(hardif)
+ 	if ACTION == 'ifdown' then return 0 end
+-	local speed = active_uplink_speed_kbit()
++	local speed
++	if hardif == 'vx_mesh_other' then
++		speed = mesh_other_speed_kbit()
++	else
++		speed = active_uplink_speed_kbit()
++	end
+ 	if not speed then
+-		warn(hardif .. ': no active uplink with readable sysfs speed; leaving default')
++		warn(hardif .. ': no carrier-up source port with a readable link speed; leaving default')
+ 		return nil
+ 	end
+ 	if hardif == 'mesh-vpn' then
+-- 
+2.43.0
+

@@ -1,0 +1,96 @@
+From dbb58e2fa6f74f11f5503d6a9884041a867483b3 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Fri, 5 Jun 2026 19:45:42 +0000
+Subject: [PATCH 16/18] fixup! gluon-mesh-batman-adv: periodic safety-net for
+ tunnel-throughput
+
+Two periodic-safety-net fixes:
+
+* The package ships a /usr/lib/micron.d cron file but did not depend on
+  micrond, which is not a base dependency; without it the periodic
+  re-evaluation never runs. Declare +micrond, matching the other
+  packages that ship a micron.d file.
+
+* compute_override() warns when no source port has a readable link
+  speed. The cron re-runs the worker every 10 minutes, so on nodes
+  whose only uplink is wireless or USB-tethered this warning repeated
+  forever. Pass GLUON_BATADV_TPO_PERIODIC=1 from the cron entry and
+  suppress the warning on periodic runs; real hotplug events still log
+  it once.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ package/gluon-mesh-batman-adv/Makefile        |  3 ++-
+ .../gluon-mesh-batman-adv-tunnel-throughput   | 19 ++++++++++++-------
+ .../mesh-batman-adv/tunnel-throughput.lua     | 10 +++++++++-
+ 3 files changed, 23 insertions(+), 9 deletions(-)
+
+diff --git a/package/gluon-mesh-batman-adv/Makefile b/package/gluon-mesh-batman-adv/Makefile
+index aac41f1b..08f97f6c 100644
+--- a/package/gluon-mesh-batman-adv/Makefile
++++ b/package/gluon-mesh-batman-adv/Makefile
+@@ -18,7 +18,8 @@ define Package/gluon-mesh-batman-adv-15
+ 	+kmod-dummy \
+ 	+libnl-tiny \
+ 	+libbatadv \
+-	+batctl
++	+batctl \
++	+micrond
+ endef
+ 
+ $(eval $(call BuildPackageGluon,gluon-mesh-batman-adv-15))
+diff --git a/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput b/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput
+index 7f75af6c..f9815242 100644
+--- a/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput
++++ b/package/gluon-mesh-batman-adv/files/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-throughput
+@@ -1,7 +1,12 @@
+-# Periodic re-evaluation of the tunnel-throughput override.
+-# hotplug.d/iface handler only fires on netifd ifup/ifdown of the wan UCI iface
+-# it misses intra-bridge cable moves (multiple role=uplink ports bridged into one
+-# wan iface).
+-# Re-running the worker every 10 minutes makes sure it converges within bounded time.
+-# The worker is idempotent and no-ops on Batman-IV.
+-*/10 * * * * ACTION=ifup INTERFACE=wan /lib/gluon/mesh-batman-adv/tunnel-throughput.lua
++# Periodic re-evaluation of the tunnel-throughput override. The
++# hotplug.d/iface handler only fires on netifd ifup/ifdown of the wan
++# UCI iface; it misses intra-bridge cable moves (multiple role=uplink
++# ports bridged into one wan iface). This re-runs the worker every
++# 10 minutes so the override converges within bounded time. The worker
++# is idempotent and no-ops on Batman-IV.
++#
++# GLUON_BATADV_TPO_PERIODIC=1 marks this as the periodic run so the worker
++# stays quiet about the expected "no readable uplink" state (e.g. nodes
++# whose only uplink is wireless or a USB tether) instead of logging it every
++# tick; real hotplug events still log it once.
++*/10 * * * * ACTION=ifup INTERFACE=wan GLUON_BATADV_TPO_PERIODIC=1 /lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+diff --git a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+index a5b02327..c330687e 100755
+--- a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
++++ b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+@@ -22,6 +22,7 @@ local posix_unistd = require 'posix.unistd'
+ 
+ local ACTION    = os.getenv('ACTION')    or ''
+ local INTERFACE = os.getenv('INTERFACE') or ''
++local PERIODIC  = os.getenv('GLUON_BATADV_TPO_PERIODIC') == '1'
+ local TAG       = 'gluon-batadv-tpo'
+ 
+ posix_syslog.openlog(TAG, 0, posix_syslog.LOG_DAEMON)
+@@ -199,7 +200,14 @@ local function compute_override(hardif)
+ 		speed = active_uplink_speed_kbit()
+ 	end
+ 	if not speed then
+-		warn(hardif .. ': no carrier-up source port with a readable link speed; leaving default')
++		-- On a real hotplug event this one-off warning explains why no
++		-- override was set. On the periodic (cron) tick it would just
++		-- repeat every 10 minutes (e.g. a node whose only uplink is
++		-- wireless/USB-tethered, or a mesh port with no carrier), so stay
++		-- quiet there.
++		if not PERIODIC then
++			warn(hardif .. ': no carrier-up source port with a readable link speed; leaving default')
++		end
+ 		return nil
+ 	end
+ 	if hardif == 'mesh-vpn' then
+-- 
+2.43.0
+

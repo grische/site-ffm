@@ -1,0 +1,130 @@
+From 6b67903299258e1e12c85a238a1cacb0db05d666 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Thu, 14 May 2026 22:24:12 +0000
+Subject: [PATCH 08/18] gluon-mesh-batman-adv: walk role=uplink for
+ tunnel-throughput auto-detect
+
+The worker previously read sysconfig.wan_ifname's sysfs speed directly.
+This breaks on Gluon's "uplink anywhere" topology: when several physical
+port ifaces all carry role='uplink' and are bridged into a single wan
+UCI iface (e.g. AVM FRITZ!Box 4020 with both the WAN port and LAN ports
+as role=uplink, both members of br-wan), moving the cable between such
+ports keeps the wan iface 'up' so no ifup/ifdown hotplug fires. The
+worker, when re-triggered later, would also read only the configured
+wan_ifname, which may have no carrier even though another role=uplink
+member does.
+
+Iterate gluon.util.get_role_interfaces(uci, 'uplink') instead, skipping
+wireless ifaces (sysfs speed is meaningless there) and non-existent
+netdevs. Take the min speed across carrier-up uplinks (conservative
+bottleneck; consistent with the bandwidth_limit min-of-ingress/egress
+philosophy already in the same file).
+
+Known limitations documented in the script header:
+
+* Intra-bridge cable moves are not auto-detected by event-driven
+  triggers alone (no hotplug fires while at least one bridge member
+  retains carrier). A separate micrond entry will re-evaluate
+  periodically as a safety net (follow-up commit).
+
+* On swconfig switches the CPU-side VLAN netdev reports the CPU port's
+  speed (typically 1G) regardless of which physical port the cable is
+  in. Verified on a FRITZ!Box 4020: swconfig CLI says "Port 4: link:up
+  speed:100baseT full-duplex" but /sys/class/net/eth0.1/speed reads
+  1000. Auto-detection is therefore accurate only on DSA switches or
+  on the swconfig WAN port itself. Operators on swconfig multi-port
+  uplinks should set throughput_override manually for precision.
+
+Drops the sysconfig require (no longer used). Verified live on a Zyxel
+WSM20 (DSA, single uplink eth0/wan -- unchanged behaviour) and an AVM
+FRITZ!Box 4020 (swconfig, eth0.1 + eth1 both role=uplink -- worker now
+correctly walks both and uses the carrier-up one's speed).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+---
+ .../mesh-batman-adv/tunnel-throughput.lua     | 59 +++++++++++++++----
+ 1 file changed, 48 insertions(+), 11 deletions(-)
+
+diff --git a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+index e67e579f..d0e1eb5d 100755
+--- a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
++++ b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+@@ -10,7 +10,6 @@
+ --   ifup mesh_vpn                            -> wait for bat0 registration,
+ --                                               apply to mesh-vpn only
+ 
+-local sysconfig    = require 'gluon.sysconfig'
+ local uci          = require 'simple-uci'
+ local util         = require 'gluon.util'
+ local posix_stat   = require 'posix.sys.stat'
+@@ -99,19 +98,57 @@ local function bandwidth_limit_cap()
+ 	return math.min(lin, leg)
+ end
+ 
+--- Compute the override to apply now. Returns kbit/s on ifup if WAN sysfs
+--- has a positive speed, 0 on ifdown, or nil if we should leave whatever
+--- is set alone (WAN unreadable -> no good answer).
++-- Return the active uplink throughput in kbit/s, walking every gluon
++-- role=uplink interface that has carrier and a readable sysfs speed.
++-- Takes min if multiple are up (conservative bottleneck).
++--
++-- Gluon's "uplink anywhere" feature lets several physical-port ifaces
++-- carry role='uplink' (e.g. on the AVM FRITZ!Box 4020 both the dedicated
++-- WAN port and the LAN ports are uplinks, bridged together into br-wan).
++-- Moving the cable between such ports keeps the wan UCI iface 'up' so
++-- no ifdown/ifup hotplug fires; the worker still reads the right speed
++-- by walking the role list rather than a single sysconfig.wan_ifname.
++--
++-- Known limitations:
++--   * Intra-bridge cable moves are not auto-detected (no hotplug fires
++--     while at least one bridge member retains carrier); a periodic
++--     micrond entry (`/usr/lib/micron.d/gluon-mesh-batman-adv-tunnel-
++--     throughput`) re-evaluates every 10 minutes as a fallback.
++--   * On swconfig switches the CPU-side VLAN netdev reports the CPU
++--     port's speed (typically 1G) regardless of which physical port the
++--     cable is in. Auto-detection is therefore accurate only on DSA
++--     switches or on the swconfig WAN port specifically.
++local function active_uplink_speed_kbit()
++	local cursor = uci.cursor()
++	local uplink_ifaces = util.get_role_interfaces(cursor, 'uplink')
++	local min_speed
++	for _, iface in ipairs(uplink_ifaces) do
++		-- Skip wireless: a mesh radio with role='uplink' would return
++		-- garbage/-1 from sysfs and isn't meaningful for tunnel
++		-- throughput. Also skip non-existent netdevs (uci-configured
++		-- but not yet created, e.g. USB tethers).
++		if not is_wireless(iface)
++			and posix_stat.stat('/sys/class/net/' .. iface) then
++			local carrier = util.readfile('/sys/class/net/' .. iface .. '/carrier')
++			if carrier and util.trim(carrier) == '1' then
++				local speed = sysfs_speed_kbit(iface)
++				if speed and (not min_speed or speed < min_speed) then
++					min_speed = speed
++				end
++			end
++		end
++	end
++	return min_speed
++end
++
++-- Compute the override to apply now. Returns kbit/s on ifup if an active
++-- uplink has a positive sysfs speed, 0 on ifdown, or nil if we should
++-- leave whatever is set alone (no readable uplink -> no good answer).
+ local function compute_override(hardif)
+ 	if ACTION == 'ifdown' then return 0 end
+-	local wan = sysconfig.wan_ifname
+-	if not wan or wan == '' then
+-		warn('sysconfig.wan_ifname empty; cannot apply')
+-		return nil
+-	end
+-	local speed = sysfs_speed_kbit(wan)
++	local speed = active_uplink_speed_kbit()
+ 	if not speed then
+-		warn(hardif .. ': WAN ' .. wan .. ' speed unreadable; leaving default')
++		warn(hardif .. ': no active uplink with readable sysfs speed; leaving default')
+ 		return nil
+ 	end
+ 	if hardif == 'mesh-vpn' then
+-- 
+2.43.0
+

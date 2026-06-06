@@ -1,7 +1,7 @@
 From 9176b6cca46f8e0ce3c027532b1f16a2c928e735 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Wed, 15 Apr 2026 17:39:35 +0200
-Subject: [PATCH 6/7] gluon-status-page-mesh-batman-adv: show only the active
+Subject: [PATCH 06/18] gluon-status-page-mesh-batman-adv: show only the active
  algorithm's metric column
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

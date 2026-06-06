@@ -1,7 +1,7 @@
 From d36039abd022b2aa0f5beeb4dfdb051d1887dd69 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Thu, 21 May 2026 22:21:24 +0200
-Subject: [PATCH 1/7] gluon-radv-filterd: use UINT16_MAX as local TQ
+Subject: [PATCH 01/18] gluon-radv-filterd: use UINT16_MAX as local TQ
 
 Instead of re-using the hysteresis threshold, use UINT16_MAX as the
 synthetic local-router TQ since any value larger than 255 dominates.
