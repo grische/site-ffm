@@ -1,7 +1,7 @@
 From bbc8d5732dca016f38788febf1a691529ce69f5c Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Fri, 15 May 2026 04:04:31 +0000
-Subject: [PATCH 11/18] gluon-mesh-batman-adv: use gluon.ethernet helper +
+Subject: [PATCH 11/19] gluon-mesh-batman-adv: use gluon.ethernet helper +
  idempotent apply
 
 Two improvements driven by an architecture review focused on

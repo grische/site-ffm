@@ -1,7 +1,7 @@
 From e503cb462ec339f07e220992c8984dcaf8d866d5 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Fri, 5 Jun 2026 20:50:22 +0000
-Subject: [PATCH 17/18] gluon-mesh-batman-adv: scope wired-mesh
+Subject: [PATCH 17/19] gluon-mesh-batman-adv: scope wired-mesh
  throughput_override to swconfig
 
 A VXLAN-over-Ethernet wired-mesh hardif (vx_mesh_uplink over br-wan,

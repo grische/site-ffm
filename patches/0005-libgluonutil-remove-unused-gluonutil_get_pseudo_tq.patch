@@ -1,7 +1,7 @@
 From b062d5acf8790218558dd45291c225d0f0b0f17c Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Wed, 15 Apr 2026 08:55:38 +0200
-Subject: [PATCH 05/18] libgluonutil: remove unused gluonutil_get_pseudo_tq
+Subject: [PATCH 05/19] libgluonutil: remove unused gluonutil_get_pseudo_tq
 
 The function synthesised a fake Batman IV TQ from a Batman V throughput
 value via a log formula. Its only caller in the tree was respondd-

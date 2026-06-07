@@ -1,7 +1,7 @@
 From b7aeba03860147cb28fa195fdc28f3300e5bb3ba Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Thu, 14 May 2026 09:32:11 +0000
-Subject: [PATCH 07/18] gluon-mesh-batman-adv: detect throughput_override for
+Subject: [PATCH 07/19] gluon-mesh-batman-adv: detect throughput_override for
  tunnel hardifs
 
 Batman-V uses link throughput as its routing metric. For physical NICs

@@ -1,7 +1,7 @@
 From 760b0d5347cbf266a57cc000c6fb0b2782d5c176 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Fri, 5 Jun 2026 19:44:54 +0000
-Subject: [PATCH 15/18] fixup! gluon-mesh-batman-adv: detect
+Subject: [PATCH 15/19] fixup! gluon-mesh-batman-adv: detect
  throughput_override for tunnel hardifs
 
 tunnel_hardifs() applied the WAN uplink speed to every batadv hardif

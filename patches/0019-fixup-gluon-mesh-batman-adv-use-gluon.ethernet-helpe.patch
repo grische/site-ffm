@@ -1,0 +1,40 @@
+From 1c47f9454d13dc67797767b878f3b819a4faf646 Mon Sep 17 00:00:00 2001
+From: Grische <github@grische.xyz>
+Date: Sun, 7 Jun 2026 18:08:46 +0200
+Subject: [PATCH 19/19] fixup! gluon-mesh-batman-adv: use gluon.ethernet helper
+ + idempotent apply
+
+Avoid the 0.5 literal in the throughput_override quantization: luasrcdiet
+minifies 0.5 to .5 and then validates the output with tonumber('.5'),
+which returns nil on OpenWrt's Lua 5.1 build ("double int32" host lua),
+aborting the gluon-mesh-batman-adv build with:
+
+    llex.lua:93: [string]:128: malformed number
+
+Use integer arithmetic ((value + 50) / 100) instead, matching the 1/2
+workaround already used in read_current_override_kbit().
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+---
+ .../luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua   | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+index cdc97a56..93861deb 100755
+--- a/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
++++ b/package/gluon-mesh-batman-adv/luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua
+@@ -244,7 +244,10 @@ local function apply_override(hardif, value)
+ 	-- the target the same way before comparing, otherwise non-whole-Mbit
+ 	-- values (e.g. an operator bandwidth_limit of 512 kbit, stored as 500)
+ 	-- would never equal the read-back value and we'd rewrite every tick.
+-	local target = math.floor(value / 100 + 0.5) * 100
++	-- (value + 50) / 100 rather than value / 100 + 0.5: a 0.5 literal is
++	-- minified by luasrcdiet to '.5', which OpenWrt's Lua 5.1 tonumber()
++	-- rejects, failing the build (see also the 1/2 above).
++	local target = math.floor((value + 50) / 100) * 100
+ 	local current = read_current_override_kbit(hardif)
+ 	if current == target then return end
+ 
+-- 
+2.43.0
+

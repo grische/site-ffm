@@ -1,7 +1,7 @@
 From d6c52e8786c547e3b6ae070d7ff104846e12d6e3 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Sat, 6 Jun 2026 11:22:14 +0200
-Subject: [PATCH 18/18] fixup! avoid invalid throughput calculation
+Subject: [PATCH 18/19] fixup! avoid invalid throughput calculation
 
 ---
  .../luasrc/lib/gluon/mesh-batman-adv/tunnel-throughput.lua      | 2 +-

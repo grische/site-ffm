@@ -1,7 +1,7 @@
 From 6b67903299258e1e12c85a238a1cacb0db05d666 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Thu, 14 May 2026 22:24:12 +0000
-Subject: [PATCH 08/18] gluon-mesh-batman-adv: walk role=uplink for
+Subject: [PATCH 08/19] gluon-mesh-batman-adv: walk role=uplink for
  tunnel-throughput auto-detect
 
 The worker previously read sysconfig.wan_ifname's sysfs speed directly.

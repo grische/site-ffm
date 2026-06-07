@@ -1,7 +1,7 @@
 From 56d0860741ad5e183f00edfd6b412fc393491e90 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Wed, 15 Apr 2026 08:55:05 +0200
-Subject: [PATCH 04/18] gluon-mesh-batman-adv: emit raw throughput for Batman V
+Subject: [PATCH 04/19] gluon-mesh-batman-adv: emit raw throughput for Batman V
  neighbours
 
 Each routing algorithm now emits its native link-quality metric in its

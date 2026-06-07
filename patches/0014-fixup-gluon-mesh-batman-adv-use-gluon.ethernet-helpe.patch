@@ -1,7 +1,7 @@
 From 909023b7766e0e9dc36730c6d3dd450524eaa36a Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Fri, 5 Jun 2026 19:44:03 +0000
-Subject: [PATCH 14/18] fixup! gluon-mesh-batman-adv: use gluon.ethernet helper
+Subject: [PATCH 14/19] fixup! gluon-mesh-batman-adv: use gluon.ethernet helper
  + idempotent apply
 
 apply_override() skips the batctl write when the kernel's current

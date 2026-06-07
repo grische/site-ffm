@@ -1,7 +1,7 @@
 From 0af19618c999f26c8b36a7339462be9261a93454 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Fri, 5 Jun 2026 21:11:33 +0200
-Subject: [PATCH 12/18] fixup! gluon-mesh-batman-adv: periodic safety-net for
+Subject: [PATCH 12/19] fixup! gluon-mesh-batman-adv: periodic safety-net for
  tunnel-throughput
 
 ---

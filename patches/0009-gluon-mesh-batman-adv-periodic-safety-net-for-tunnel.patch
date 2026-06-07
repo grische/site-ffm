@@ -1,7 +1,7 @@
 From acd1df2bc546dfae6cf417a2bc1d70bfe4f582b9 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Thu, 14 May 2026 22:25:28 +0000
-Subject: [PATCH 09/18] gluon-mesh-batman-adv: periodic safety-net for
+Subject: [PATCH 09/19] gluon-mesh-batman-adv: periodic safety-net for
  tunnel-throughput
 
 The hotplug.d/iface handler is structurally blind to intra-bridge cable

@@ -1,7 +1,7 @@
 From b90fcb79e952f0f9a1f633bf0e2cc5b3c7fac6a8 Mon Sep 17 00:00:00 2001
 From: Grische <github@grische.xyz>
 Date: Fri, 15 May 2026 04:04:04 +0000
-Subject: [PATCH 10/18] gluon-core: add gluon.ethernet.get_link_speed_kbit()
+Subject: [PATCH 10/19] gluon-core: add gluon.ethernet.get_link_speed_kbit()
  helper
 
 A central place to ask "how fast is this Ethernet-shaped netdev?".
